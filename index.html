@@ -26,11 +26,38 @@
             margin-left: auto;
             margin-right: auto;
         }
-        button:active {
-            background: #0056b3;
+        #driftCounter {
+            height: 150px;
+            font-size: 28px;
+            transition: background 0.3s ease;
         }
-        p {
+        #endJourney {
+            background: red;
+            color: white;
             font-size: 20px;
+            padding: 20px;
+            border-radius: 20px;
+            position: relative;
+            width: 90%;
+            max-width: 400px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            cursor: grab;
+        }
+        #endJourney::after {
+            content: "Swipe to End";
+            position: absolute;
+            font-size: 18px;
+            opacity: 0.8;
+        }
+        .swipe-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         ul {
             list-style-type: none;
@@ -48,16 +75,19 @@
     <h1>Driving Meditation App</h1>
     <button id="startJourney">Start Meditation Journey</button>
     <button id="driftCounter">Mind Drifted</button>
-    <button id="endJourney">End Journey</button>
-    <p>Time Elapsed: <span id="timeElapsed">0s</span></p>
+    <div class="swipe-container">
+        <div id="endJourney">Swipe to End</div>
+    </div>
     <h2>Previous Journeys</h2>
     <ul id="journeyList"></ul>
+    <audio id="startSound" src="start.mp3"></audio>
+    <audio id="driftSound" src="drift.mp3"></audio>
+    <audio id="endSound" src="end.mp3"></audio>
     
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             let startTime = null;
             let driftCount = 0;
-            let timerInterval = null;
             let startLocation = null;
             let endLocation = null;
             const journeyHistory = JSON.parse(localStorage.getItem("journeys")) || [];
@@ -66,76 +96,73 @@
             const driftBtn = document.getElementById("driftCounter");
             const endBtn = document.getElementById("endJourney");
             const journeyList = document.getElementById("journeyList");
-            const timeDisplay = document.getElementById("timeElapsed");
+            const startSound = document.getElementById("startSound");
+            const driftSound = document.getElementById("driftSound");
+            const endSound = document.getElementById("endSound");
     
             function updateJourneyList() {
                 journeyList.innerHTML = "";
                 journeyHistory.forEach((journey, index) => {
                     const listItem = document.createElement("li");
-                    listItem.textContent = `Session ${index + 1}: ${journey.time} sec, Drifts: ${journey.drifts}, DPM: ${journey.dpm.toFixed(2)}, Start: ${journey.startLoc}, End: ${journey.endLoc}`;
+                    listItem.textContent = `Session ${index + 1}: Start: ${journey.startLoc}, End: ${journey.endLoc}, Time: ${journey.time} sec, Drifts: ${journey.drifts}`;
                     journeyList.appendChild(listItem);
                 });
             }
     
-            function getLocation(callback) {
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(position => {
-                        const { latitude, longitude } = position.coords;
-                        callback(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
-                    }, () => {
-                        callback("Location unavailable");
-                    });
-                } else {
-                    callback("Geolocation not supported");
-                }
-            }
-    
             startBtn.addEventListener("click", () => {
-                startTime = Date.now();
+                startSound.play();
+                driftBtn.style.background = "green";
                 driftCount = 0;
-                timeDisplay.textContent = "0s";
-    
-                getLocation(loc => startLocation = loc);
-    
-                if (timerInterval) clearInterval(timerInterval);
-                timerInterval = setInterval(() => {
-                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-                    timeDisplay.textContent = `${elapsed}s`;
-                }, 1000);
+                startTime = Date.now();
             });
     
             driftBtn.addEventListener("click", () => {
                 if (startTime) {
                     driftCount++;
+                    driftSound.play();
+                    driftBtn.style.background = "#4CAF50";
+                    setTimeout(() => {
+                        driftBtn.style.background = "green";
+                    }, 200);
                 }
             });
     
-            endBtn.addEventListener("click", () => {
+            let swipeStartX = 0;
+            let isSwiping = false;
+    
+            function endJourney() {
                 if (!startTime) return;
-    
-                clearInterval(timerInterval);
+                endSound.play();
                 const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-                const driftsPerMin = elapsedTime > 0 ? (driftCount / (elapsedTime / 60)) : 0;
+                const journeyData = { startLoc: startLocation, endLoc: endLocation, time: elapsedTime, drifts: driftCount };
+                journeyHistory.push(journeyData);
+                localStorage.setItem("journeys", JSON.stringify(journeyHistory));
+                updateJourneyList();
+                driftBtn.style.background = "";
+                startTime = null;
+            }
     
-                getLocation(loc => {
-                    endLocation = loc;
-                    const journeyData = { 
-                        time: elapsedTime, 
-                        drifts: driftCount, 
-                        dpm: driftsPerMin, 
-                        startLoc: startLocation, 
-                        endLoc: endLocation
-                    };
-    
-                    journeyHistory.push(journeyData);
-                    localStorage.setItem("journeys", JSON.stringify(journeyHistory));
-    
-                    alert(`Journey Ended!\nTime: ${elapsedTime}s\nDrifts: ${driftCount}\nDrifts per Minute: ${driftsPerMin.toFixed(2)}\nStart: ${startLocation}\nEnd: ${endLocation}`);
-                    updateJourneyList();
-    
-                    startTime = null;
-                });
+            endBtn.addEventListener("mousedown", (e) => {
+                swipeStartX = e.clientX;
+                isSwiping = true;
             });
+    
+            endBtn.addEventListener("mousemove", (e) => {
+                if (isSwiping && (e.clientX - swipeStartX) > 150) {
+                    isSwiping = false;
+                    endJourney();
+                }
+            });
+    
+            endBtn.addEventListener("mouseup", () => { isSwiping = false; });
+            endBtn.addEventListener("touchstart", (e) => { swipeStartX = e.touches[0].clientX; isSwiping = true; });
+            endBtn.addEventListener("touchmove", (e) => {
+                if (isSwiping && (e.touches[0].clientX - swipeStartX) > 150) {
+                    isSwiping = false;
+                    endJourney();
+                }
+            });
+            endBtn.addEventListener("touchend", () => { isSwiping = false; });
     
             updateJourneyList();
         });
