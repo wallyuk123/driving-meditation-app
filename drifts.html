@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driving Meditation App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+            background: #f0f0f0;
+        }
+        button {
+            font-size: 24px;
+            padding: 15px;
+            margin: 15px;
+            width: 90%;
+            max-width: 400px;
+            border: none;
+            border-radius: 10px;
+            background: #007BFF;
+            color: white;
+            cursor: pointer;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        button:active {
+            background: #0056b3;
+        }
+        p {
+            font-size: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: white;
+            margin: 5px;
+            padding: 15px;
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Driving Meditation App</h1>
+    <button id="startJourney">Start Meditation Journey</button>
+    <button id="driftCounter">Mind Drifted</button>
+    <button id="endJourney">End Journey</button>
+    <p>Time Elapsed: <span id="timeElapsed">0s</span></p>
+    <h2>Previous Journeys</h2>
+    <ul id="journeyList"></ul>
+    
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            let startTime = null;
+            let driftCount = 0;
+            let timerInterval = null;
+            let startLocation = null;
+            let endLocation = null;
+            const journeyHistory = JSON.parse(localStorage.getItem("journeys")) || [];
+    
+            const startBtn = document.getElementById("startJourney");
+            const driftBtn = document.getElementById("driftCounter");
+            const endBtn = document.getElementById("endJourney");
+            const journeyList = document.getElementById("journeyList");
+            const timeDisplay = document.getElementById("timeElapsed");
+    
+            function updateJourneyList() {
+                journeyList.innerHTML = "";
+                journeyHistory.forEach((journey, index) => {
+                    const listItem = document.createElement("li");
+                    listItem.textContent = `Session ${index + 1}: ${journey.time} sec, Drifts: ${journey.drifts}, DPM: ${journey.dpm.toFixed(2)}, Start: ${journey.startLoc}, End: ${journey.endLoc}`;
+                    journeyList.appendChild(listItem);
+                });
+            }
+    
+            function getLocation(callback) {
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(position => {
+                        const { latitude, longitude } = position.coords;
+                        callback(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`);
+                    }, () => {
+                        callback("Location unavailable");
+                    });
+                } else {
+                    callback("Geolocation not supported");
+                }
+            }
+    
+            startBtn.addEventListener("click", () => {
+                startTime = Date.now();
+                driftCount = 0;
+                timeDisplay.textContent = "0s";
+    
+                getLocation(loc => startLocation = loc);
+    
+                if (timerInterval) clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                    timeDisplay.textContent = `${elapsed}s`;
+                }, 1000);
+            });
+    
+            driftBtn.addEventListener("click", () => {
+                if (startTime) {
+                    driftCount++;
+                }
+            });
+    
+            endBtn.addEventListener("click", () => {
+                if (!startTime) return;
+    
+                clearInterval(timerInterval);
+                const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+                const driftsPerMin = elapsedTime > 0 ? (driftCount / (elapsedTime / 60)) : 0;
+    
+                getLocation(loc => {
+                    endLocation = loc;
+                    const journeyData = { 
+                        time: elapsedTime, 
+                        drifts: driftCount, 
+                        dpm: driftsPerMin, 
+                        startLoc: startLocation, 
+                        endLoc: endLocation
+                    };
+    
+                    journeyHistory.push(journeyData);
+                    localStorage.setItem("journeys", JSON.stringify(journeyHistory));
+    
+                    alert(`Journey Ended!\nTime: ${elapsedTime}s\nDrifts: ${driftCount}\nDrifts per Minute: ${driftsPerMin.toFixed(2)}\nStart: ${startLocation}\nEnd: ${endLocation}`);
+                    updateJourneyList();
+    
+                    startTime = null;
+                });
+            });
+    
+            updateJourneyList();
+        });
+    </script>
+</body>
+</html>
