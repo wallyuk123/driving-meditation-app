@@ -47,12 +47,6 @@
             user-select: none;
             cursor: grab;
         }
-        #endJourney::after {
-            content: "Swipe to End";
-            position: absolute;
-            font-size: 18px;
-            opacity: 0.8;
-        }
         .swipe-container {
             width: 100%;
             display: flex;
@@ -73,6 +67,10 @@
 </head>
 <body>
     <h1>Driving Meditation App</h1>
+    <select id="journeySelect">
+        <option value="">Select a Journey</option>
+    </select>
+    <button id="addJourney">Add New Journey</button>
     <button id="startJourney">Start Meditation Journey</button>
     <button id="driftCounter">Mind Drifted</button>
     <div class="swipe-container">
@@ -88,10 +86,12 @@
         document.addEventListener("DOMContentLoaded", () => {
             let startTime = null;
             let driftCount = 0;
-            let startLocation = null;
-            let endLocation = null;
+            let selectedJourney = "";
             const journeyHistory = JSON.parse(localStorage.getItem("journeys")) || [];
+            let savedJourneys = JSON.parse(localStorage.getItem("savedJourneys")) || ["Driving to Work", "Going to Tesco", "Driving Home from Work"];
     
+            const journeySelect = document.getElementById("journeySelect");
+            const addJourneyBtn = document.getElementById("addJourney");
             const startBtn = document.getElementById("startJourney");
             const driftBtn = document.getElementById("driftCounter");
             const endBtn = document.getElementById("endJourney");
@@ -104,12 +104,39 @@
                 journeyList.innerHTML = "";
                 journeyHistory.forEach((journey, index) => {
                     const listItem = document.createElement("li");
-                    listItem.textContent = `Session ${index + 1}: Start: ${journey.startLoc}, End: ${journey.endLoc}, Time: ${journey.time} sec, Drifts: ${journey.drifts}`;
+                    listItem.textContent = `Session ${index + 1}: ${journey.name}, Time: ${journey.time} sec, Drifts: ${journey.drifts}`;
                     journeyList.appendChild(listItem);
                 });
             }
     
+            function updateJourneyDropdown() {
+                journeySelect.innerHTML = "";
+                savedJourneys.forEach(journey => {
+                    const option = document.createElement("option");
+                    option.value = journey;
+                    option.textContent = journey;
+                    journeySelect.appendChild(option);
+                });
+            }
+            
+            addJourneyBtn.addEventListener("click", () => {
+                const newJourney = prompt("Enter new journey name:");
+                if (newJourney && !savedJourneys.includes(newJourney)) {
+                    savedJourneys.push(newJourney);
+                    localStorage.setItem("savedJourneys", JSON.stringify(savedJourneys));
+                    updateJourneyDropdown();
+                }
+            });
+            
+            journeySelect.addEventListener("change", () => {
+                selectedJourney = journeySelect.value;
+            });
+    
             startBtn.addEventListener("click", () => {
+                if (!selectedJourney) {
+                    alert("Please select a journey before starting.");
+                    return;
+                }
                 startSound.play();
                 driftBtn.style.background = "green";
                 driftCount = 0;
@@ -134,7 +161,7 @@
                 if (!startTime) return;
                 endSound.play();
                 const elapsedTime = Math.floor((Date.now() - startTime) / 1000);
-                const journeyData = { startLoc: startLocation, endLoc: endLocation, time: elapsedTime, drifts: driftCount };
+                const journeyData = { name: selectedJourney, time: elapsedTime, drifts: driftCount };
                 journeyHistory.push(journeyData);
                 localStorage.setItem("journeys", JSON.stringify(journeyHistory));
                 updateJourneyList();
@@ -142,19 +169,15 @@
                 startTime = null;
             }
     
-            endBtn.addEventListener("mousedown", (e) => {
-                swipeStartX = e.clientX;
-                isSwiping = true;
-            });
-    
+            endBtn.addEventListener("mousedown", (e) => { swipeStartX = e.clientX; isSwiping = true; });
             endBtn.addEventListener("mousemove", (e) => {
                 if (isSwiping && (e.clientX - swipeStartX) > 150) {
                     isSwiping = false;
                     endJourney();
                 }
             });
-    
             endBtn.addEventListener("mouseup", () => { isSwiping = false; });
+    
             endBtn.addEventListener("touchstart", (e) => { swipeStartX = e.touches[0].clientX; isSwiping = true; });
             endBtn.addEventListener("touchmove", (e) => {
                 if (isSwiping && (e.touches[0].clientX - swipeStartX) > 150) {
@@ -164,6 +187,7 @@
             });
             endBtn.addEventListener("touchend", () => { isSwiping = false; });
     
+            updateJourneyDropdown();
             updateJourneyList();
         });
     </script>
